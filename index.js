@@ -37,9 +37,6 @@ app.get("/get-invoice", async (req, res) => {
           printBackground: false,
         });
 
-        await context.close();
-        await browser.close();
-
         if (outputType === "json") {
           res.setHeader("Content-type", "application/json");
           return res.json({ status: true, result: pdf.toString("base64") });
@@ -50,6 +47,9 @@ app.get("/get-invoice", async (req, res) => {
       } catch (error) {
         console.log(error);
         return res.json({ status: false, error });
+      } finally {
+        await context.close();
+        await browser.close();
       }
     } else {
       const playwright = import("playwright-aws-lambda");
