@@ -1,0 +1,22 @@
+{
+  "name": "puppeteer",
+  "version": "1.0.0",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node --watch index.js"
+  },
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.1",
+    "playwright-aws-lambda": "^0.11.0",
+    "playwright-core": "^1.48.2"
+  },
+  "devDependencies": {
+    "playwright": "^1.48.2"
+  }
+}
