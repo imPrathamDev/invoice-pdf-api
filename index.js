@@ -28,52 +28,40 @@ app.get("/get-invoice", async (req, res) => {
     });
   }
 
-  const URL = `https://invogennn.netlify.app/create/preview/671e5b28000f028b9e88`;
+  const URL = `https://invogennn.netlify.app/create/preview/${id}`;
   const outputType = type ?? "json";
 
   try {
     let browser = null;
-    let playwright;
-
-    // Configure chrome executable path for Vercel
-    const chromeExecPaths = {
-      win32: "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
-      linux: "/usr/bin/google-chrome",
-      darwin: "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-    };
-
-    const exePath = chromeExecPaths[process.platform];
 
     if (IS_PRODUCTION === "false") {
-      playwright = await import("playwright");
+      // Development environment
+      const playwright = await import("playwright");
       browser = await playwright.chromium.launch({
         headless: true,
       });
     } else {
-      playwright = await import("playwright-aws-lambda");
-      browser = await playwright.launchChromium({
-        headless: true,
-        executablePath: exePath,
-        args: [
-          "--no-sandbox",
-          "--disable-setuid-sandbox",
-          "--disable-dev-shm-usage",
-          "--disable-accelerated-2d-canvas",
-          "--no-first-run",
-          "--no-zygote",
-          "--disable-gpu",
-        ],
+      // Production environment (Vercel)
+      const chromium = await import("@sparticuz/chromium");
+      const playwright = await import("playwright-core");
+
+      // Configure Chrome for AWS Lambda
+      await chromium.default.font("/var/task/fonts/");
+
+      browser = await playwright.chromium.launch({
+        args: chromium.args,
+        executablePath: await chromium.executablePath(),
+        headless: chromium.headless,
       });
     }
 
     const context = await browser.newContext();
     const page = await context.newPage();
 
-    // Add error handling for navigation
     await page
       .goto(URL, {
         waitUntil: "networkidle",
-        timeout: 30000, // 30 second timeout
+        timeout: 30000,
       })
       .catch((error) => {
         throw new Error(`Navigation failed: ${error.message}`);
