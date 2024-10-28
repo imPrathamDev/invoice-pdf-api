@@ -50,8 +50,9 @@ app.get("/get-invoice", async (req, res) => {
 
       browser = await playwright.chromium.launch({
         args: chromium.args,
-        executablePath: await chromium.executablePath(),
+        executablePath: await chromium.executablePath,
         headless: chromium.headless,
+        defaultViewport: chromium.defaultViewport,
       });
     }
 
