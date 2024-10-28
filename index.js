@@ -1,8 +1,9 @@
 import express from "express";
 import { config } from "dotenv";
 import cors from "cors";
+
 const app = express();
-const port = 3000;
+const port = process.env.PORT || 3000;
 
 config({
   path: [".env.local", ".env"],
@@ -17,83 +18,98 @@ app.get("/", (req, res) => {
 app.get("/get-invoice", async (req, res) => {
   const { id, type } = req.query;
   const IS_PRODUCTION = process.env.PRODUCTION;
-  if (id && id.length > 0) {
-    const URL =
-      "https://invogennn.netlify.app/create/preview/671e5b28000f028b9e88";
-    const outputType = type ?? "json";
-    if (IS_PRODUCTION === "false") {
-      const playwright = import("playwright");
-      try {
-        const browser = await (
-          await playwright
-        ).chromium.launch({
-          headless: true,
-        });
-        const context = await browser.newContext();
-        const page = await context.newPage();
-        await page.goto(URL, { waitUntil: "networkidle" });
-        const pdf = await page.pdf({
-          format: "a4",
-          printBackground: false,
-        });
 
-        await context.close();
-        await browser.close();
-
-        if (outputType === "json") {
-          res.setHeader("Content-type", "application/json");
-          return res.json({ status: true, result: pdf.toString("base64") });
-        }
-        res.setHeader("Content-type", "application/pdf");
-        res.send(pdf);
-        res.end();
-      } catch (error) {
-        console.log(error);
-        return res.json({ status: false, error });
-      }
-    } else {
-      const playwright = import("playwright-aws-lambda");
-      let browser = null;
-
-      try {
-        browser = await (
-          await playwright
-        ).launchChromium({
-          headless: true,
-        });
-        const context = await browser.newContext();
-
-        const page = await context.newPage();
-        await page.goto(URL, { waitUntil: "networkidle" });
-        const pdf = await page.pdf({
-          format: "a4",
-          printBackground: false,
-        });
-
-        if (outputType === "json") {
-          res.setHeader("Content-type", "application/json");
-          return res.json({ status: true, result: pdf.toString("base64") });
-        }
-        res.setHeader("Content-type", "application/pdf");
-        res.send(pdf);
-        res.end();
-      } catch (error) {
-        console.log(error);
-        return res.json({ status: false, error });
-      } finally {
-        await context.close();
-        await browser.close();
-      }
-    }
+  if (!id || id.length === 0) {
+    return res.status(400).json({
+      success: false,
+      error: {
+        message: "id can't be empty.",
+      },
+    });
   }
-  return res.json({
-    success: false,
-    error: {
-      message: "id can't be empty.",
-    },
-  });
+
+  const URL = `https://invogennn.netlify.app/create/preview/671e5b28000f028b9e88`;
+  const outputType = type ?? "json";
+
+  try {
+    let browser = null;
+    let playwright;
+
+    // Configure chrome executable path for Vercel
+    const chromeExecPaths = {
+      win32: "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+      linux: "/usr/bin/google-chrome",
+      darwin: "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+    };
+
+    const exePath = chromeExecPaths[process.platform];
+
+    if (IS_PRODUCTION === "false") {
+      playwright = await import("playwright");
+      browser = await playwright.chromium.launch({
+        headless: true,
+      });
+    } else {
+      playwright = await import("playwright-aws-lambda");
+      browser = await playwright.launchChromium({
+        headless: true,
+        executablePath: exePath,
+        args: [
+          "--no-sandbox",
+          "--disable-setuid-sandbox",
+          "--disable-dev-shm-usage",
+          "--disable-accelerated-2d-canvas",
+          "--no-first-run",
+          "--no-zygote",
+          "--disable-gpu",
+        ],
+      });
+    }
+
+    const context = await browser.newContext();
+    const page = await context.newPage();
+
+    // Add error handling for navigation
+    await page
+      .goto(URL, {
+        waitUntil: "networkidle",
+        timeout: 30000, // 30 second timeout
+      })
+      .catch((error) => {
+        throw new Error(`Navigation failed: ${error.message}`);
+      });
+
+    const pdf = await page.pdf({
+      format: "a4",
+      printBackground: false,
+    });
+
+    await context.close();
+    await browser.close();
+
+    if (outputType === "json") {
+      res.setHeader("Content-type", "application/json");
+      return res.json({
+        status: true,
+        result: pdf.toString("base64"),
+      });
+    }
+
+    res.setHeader("Content-type", "application/pdf");
+    res.send(pdf);
+    return res.end();
+  } catch (error) {
+    console.error("PDF Generation Error:", error);
+    return res.status(500).json({
+      status: false,
+      error: {
+        message: error.message,
+        stack: process.env.NODE_ENV === "development" ? error.stack : undefined,
+      },
+    });
+  }
 });
 
 app.listen(port, () => {
-  console.log(`app listening on port ${port}`);
+  console.log(`App listening on port ${port}`);
 });
